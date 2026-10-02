@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Sans } from "next/font/google";
 import { SITE_URL, specialMeta } from "./site-content";
+import { ContactProvider } from "./contact-context";
+import { getContactInfo } from "@/lib/data";
 import "./globals.css";
 
 const archivo = Archivo({ subsets: ["latin"], variable: "--font-display", display: "swap" });
@@ -30,10 +32,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Pages are cached and refreshed hourly; saving in the site manager refreshes them immediately.
+export const revalidate = 3600;
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const contact = await getContactInfo();
   return (
     <html lang="en">
-      <body className={`${archivo.variable} ${plex.variable}`}>{children}</body>
+      <body className={`${archivo.variable} ${plex.variable}`}>
+        <ContactProvider value={contact}>{children}</ContactProvider>
+      </body>
     </html>
   );
 }

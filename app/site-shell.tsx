@@ -1,19 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  EMAIL,
-  PHONE,
-  PHONE_HREF,
-  employerPages,
-  industryPages,
-  type ContentPage,
-} from "./site-content";
+import { employerPages, industryPages, type ContentPage } from "./site-content";
+import { useContact } from "./contact-context";
+import { applyHref, formatDate, type Opportunity } from "@/lib/opportunities";
 
 export type ShellProps =
   | { kind: "home" }
   | { kind: "content"; page: ContentPage }
-  | { kind: "jobs" }
+  | { kind: "jobs"; jobs: Opportunity[] }
+  | { kind: "job"; job: Opportunity }
   | { kind: "talent" }
   | { kind: "contact" }
   | { kind: "notfound" };
@@ -97,6 +93,7 @@ function Header() {
 }
 
 function Footer() {
+  const contact = useContact();
   return (
     <footer className="site-footer">
       <div className="footer-top">
@@ -135,8 +132,8 @@ function Footer() {
       <div className="footer-bottom">
         <span>Based in the St. Louis region. Serving nationwide.</span>
         <div>
-          <a href={PHONE_HREF}>{PHONE}</a>
-          <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+          <a href={contact.phoneHref}>{contact.phone}</a>
+          <a href={`mailto:${contact.email}`}>{contact.email}</a>
         </div>
         <span>© 2026 Russo Operational Consulting Group</span>
       </div>
@@ -604,7 +601,109 @@ function ClosingBand({
   );
 }
 
-function Jobs() {
+function jobFacts(job: Opportunity) {
+  return [job.location, job.employment_type, job.work_model].filter(Boolean);
+}
+
+function JobList({ jobs }: { jobs: Opportunity[] }) {
+  return (
+    <section className="job-list-section section-pad">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow dark">Public openings</p>
+          <h2>
+            {jobs.length} open {jobs.length === 1 ? "search" : "searches"}
+          </h2>
+        </div>
+        <p>
+          Each listing is a live search ROC owns. If none fits, the Talent Network keeps you in view for upcoming
+          roles.
+        </p>
+      </div>
+      <div className="job-list">
+        {jobs.map((job) => (
+          <a key={job.id} href={`/jobs/${job.slug}`}>
+            <div>
+              <h3>{job.title}</h3>
+              <p className="job-facts">{jobFacts(job).join(" · ")}</p>
+              {job.summary && <p>{job.summary}</p>}
+            </div>
+            <b>
+              View role <Arrow />
+            </b>
+          </a>
+        ))}
+      </div>
+      <a className="text-link" href="/talent-network">
+        Join the ROC talent network <Arrow />
+      </a>
+    </section>
+  );
+}
+
+function JobDetail({ job }: { job: Opportunity }) {
+  const contact = useContact();
+  const facts: [string, string][] = (
+    [
+      ["Location", job.location],
+      ["Employment", job.employment_type],
+      ["Work model", job.work_model],
+      ["Travel", job.travel],
+      ["Clearance", job.clearance],
+      ["Compensation", job.compensation],
+      ["Posted", formatDate(job.posted_on)],
+      ["Apply by", job.closes_on ? formatDate(job.closes_on) : ""],
+    ] as [string, string][]
+  ).filter(([, v]) => v);
+  const apply = applyHref(job, contact.email);
+  return (
+    <>
+      <section className="inner-hero simple">
+        <div className="inner-hero-copy">
+          <p className="eyebrow">{jobFacts(job).join(" · ") || "Current opportunity"}</p>
+          <h1>{job.title}</h1>
+          {job.summary && <p>{job.summary}</p>}
+          <div className="hero-actions">
+            <a className="button gold" href={apply} {...(apply.startsWith("http") ? { target: "_blank", rel: "noopener" } : {})}>
+              Apply for this role <Arrow />
+            </a>
+            <a className="text-link light" href="/jobs">
+              All opportunities <Arrow />
+            </a>
+          </div>
+        </div>
+        <HeroVisual compact />
+      </section>
+      <section className="job-detail section-pad">
+        <dl className="job-facts-list">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="job-body">
+          {job.details
+            .split(/\n\s*\n/)
+            .filter((p) => p.trim())
+            .map((p, i) => (
+              <p key={i}>{p.trim()}</p>
+            ))}
+          <a className="button navy" href={apply} {...(apply.startsWith("http") ? { target: "_blank", rel: "noopener" } : {})}>
+            Apply for this role <Arrow />
+          </a>
+          <p className="form-note">
+            Not quite the right fit? <a href="/talent-network">Join the Talent Network</a> and ROC will keep you in
+            view for upcoming searches.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function Jobs({ jobs }: { jobs: Opportunity[] }) {
   return (
     <>
       <section className="inner-hero simple">
@@ -618,6 +717,9 @@ function Jobs() {
         </div>
         <HeroVisual compact />
       </section>
+      {jobs.length > 0 ? (
+        <JobList jobs={jobs} />
+      ) : (
       <section className="empty-jobs section-pad">
         <div className="empty-marker">00</div>
         <div>
@@ -632,6 +734,7 @@ function Jobs() {
           </a>
         </div>
       </section>
+      )}
       <section className="candidate-promise section-pad">
         <h2>What ROC will—and will not—do.</h2>
         <div>
@@ -685,6 +788,7 @@ const subjects: Record<string, string> = {
 };
 
 function SmartForm({ mode }: { mode: "contact" | "talent" }) {
+  const { email } = useContact();
   const [intent, setIntent] = useState(mode === "talent" ? "candidate" : "hiring");
   const [sent, setSent] = useState(false);
 
@@ -701,7 +805,7 @@ function SmartForm({ mode }: { mode: "contact" | "talent" }) {
     const form = e.currentTarget;
     if (!form.reportValidity()) return;
     const lines = Array.from(new FormData(form).entries()).map(([k, v]) => `${k}: ${String(v)}`);
-    window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
       lines.join("\n"),
     )}`;
     setSent(true);
@@ -840,6 +944,7 @@ function SmartForm({ mode }: { mode: "contact" | "talent" }) {
 }
 
 function FormPage({ talent = false }: { talent?: boolean }) {
+  const contact = useContact();
   return (
     <>
       <section className="form-hero">
@@ -854,8 +959,8 @@ function FormPage({ talent = false }: { talent?: boolean }) {
         </div>
         <aside>
           <span>Direct contact</span>
-          <a href={PHONE_HREF}>{PHONE}</a>
-          <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+          <a href={contact.phoneHref}>{contact.phone}</a>
+          <a href={`mailto:${contact.email}`}>{contact.email}</a>
           <small>
             St. Louis region
             <br />
@@ -893,7 +998,8 @@ export function SiteShell(props: ShellProps) {
       <main id="main-content">
         {props.kind === "home" && <Home />}
         {props.kind === "content" && <ContentView page={props.page} />}
-        {props.kind === "jobs" && <Jobs />}
+        {props.kind === "jobs" && <Jobs jobs={props.jobs} />}
+        {props.kind === "job" && <JobDetail job={props.job} />}
         {props.kind === "talent" && <FormPage talent />}
         {props.kind === "contact" && <FormPage />}
         {props.kind === "notfound" && <NotFound />}

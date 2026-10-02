@@ -5,8 +5,8 @@ import { SiteShell, type ShellProps } from "../site-shell";
 
 type Params = { slug: string[] };
 
-const special: Record<string, { kind: "jobs" | "talent" | "contact"; meta: { title: string; description: string } }> = {
-  jobs: { kind: "jobs", meta: specialMeta.jobs },
+// /jobs has its own route (app/jobs) because its listings come from the database.
+const special: Record<string, { kind: "talent" | "contact"; meta: { title: string; description: string } }> = {
   "talent-network": { kind: "talent", meta: specialMeta["talent-network"] },
   contact: { kind: "contact", meta: specialMeta.contact },
 };
