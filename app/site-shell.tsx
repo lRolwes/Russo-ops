@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { employerPages, industryPages, type ContentPage } from "./site-content";
 import { useContact } from "./contact-context";
 import { applyHref, formatDate, type Opportunity } from "@/lib/opportunities";
+import { INQUIRY_LABELS } from "@/lib/inquiries";
+import { submitInquiry, type InquiryState } from "./form-actions";
 
 export type ShellProps =
   | { kind: "home" }
@@ -777,42 +779,59 @@ function NotFound() {
   );
 }
 
-const subjects: Record<string, string> = {
-  hiring: "Hiring Need",
-  skillbridge: "SkillBridge Assessment",
-  veteran: "Veteran Hiring",
-  teaming: "Teaming Opportunity",
-  advisory: "Workforce Advisory",
-  candidate: "Talent Network Profile",
-  general: "General Inquiry",
-};
-
 function SmartForm({ mode }: { mode: "contact" | "talent" }) {
-  const { email } = useContact();
+  const { email, phone, phoneHref } = useContact();
   const [intent, setIntent] = useState(mode === "talent" ? "candidate" : "hiring");
-  const [sent, setSent] = useState(false);
+  const [state, action, pending] = useActionState<InquiryState, FormData>(submitInquiry, {});
+  const [startedAt, setStartedAt] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
+    setStartedAt(Date.now());
     if (mode !== "contact") return;
     const q = new URLSearchParams(window.location.search).get("intent");
-    if (q) setIntent(q);
+    if (q && q in INQUIRY_LABELS) setIntent(q);
   }, [mode]);
 
-  const subject = useMemo(() => `ROC Website: ${subjects[intent] ?? "Inquiry"}`, [intent]);
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state]);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     if (!form.reportValidity()) return;
-    const lines = Array.from(new FormData(form).entries()).map(([k, v]) => `${k}: ${String(v)}`);
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
-      lines.join("\n"),
-    )}`;
-    setSent(true);
+    const fd = new FormData(form);
+    fd.set("_mode", mode);
+    fd.set("_page", window.location.pathname + window.location.search);
+    fd.set("_t", String(startedAt));
+    // Submitted manually (not via the action prop) so a server-side error never clears what was typed.
+    startTransition(() => action(fd));
+  }
+
+  if (state.ok) {
+    return (
+      <div className="smart-form form-done" role="status">
+        <p className="eyebrow dark">Message received</p>
+        <h3>Thank you — your {mode === "talent" ? "profile" : "message"} is with ROC.</h3>
+        <p>
+          {mode === "talent"
+            ? "ROC will reach out when a role or conversation fits the experience you shared."
+            : "ROC will follow up by email or phone."}{" "}
+          Need to add something? Email <a href={`mailto:${email}`}>{email}</a> or call{" "}
+          <a href={phoneHref}>{phone}</a>.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <form className="smart-form" onSubmit={onSubmit}>
+    <form ref={formRef} className="smart-form" onSubmit={onSubmit}>
+      <div className="hp-field" aria-hidden="true">
+        <label>
+          Leave this empty <input name="_hp" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
       <div className="form-grid">
         <label>
           <span>Name *</span>
@@ -927,18 +946,18 @@ function SmartForm({ mode }: { mode: "contact" | "talent" }) {
           </span>
         </label>
       </div>
-      <button className="button gold" type="submit">
-        Prepare email to ROC <Arrow />
-      </button>
-      <p className="form-note">
-        This secure handoff opens your email application so you can review the message before sending. Attach a
-        résumé there if needed.
-      </p>
-      {sent && (
-        <p className="form-success" role="status">
-          Your email application should now be open. Review the message and press send to contact ROC.
+      {state.error && (
+        <p className="form-error" role="alert">
+          {state.error}
         </p>
       )}
+      <button className="button gold" type="submit" disabled={pending}>
+        {pending ? "Sending…" : mode === "talent" ? "Send my profile to ROC" : "Send to ROC"} <Arrow />
+      </button>
+      <p className="form-note">
+        Your message goes directly to ROC.{" "}
+        {mode === "talent" ? "If a role fits, ROC will ask for your résumé by email." : ""}
+      </p>
     </form>
   );
 }

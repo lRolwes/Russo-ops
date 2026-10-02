@@ -90,13 +90,35 @@ export async function deleteOpportunity(fd: FormData) {
   redirect("/admin?deleted=1");
 }
 
+export async function setSubmissionStatus(fd: FormData) {
+  if (!(await currentAdmin())) redirect("/admin/login");
+  const status = text(fd, "status") === "handled" ? "handled" : "new";
+  await query("update submissions set status = $1 where id = $2", [status, text(fd, "id")]);
+  revalidatePath("/admin", "layout"); // refresh the "new inquiries" count in the menu
+  redirect(status === "handled" ? "/admin/inquiries" : `/admin/inquiries/${text(fd, "id")}`);
+}
+
+export async function deleteSubmission(fd: FormData) {
+  if (!(await currentAdmin())) redirect("/admin/login");
+  await query("delete from submissions where id = $1", [text(fd, "id")]);
+  revalidatePath("/admin", "layout");
+  redirect("/admin/inquiries?deleted=1");
+}
+
+const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+
 export async function saveSettings(_: FormState, fd: FormData): Promise<FormState> {
   if (!(await currentAdmin())) return { error: "Your session has ended. Sign in again." };
   const phone = text(fd, "phone");
   const email = text(fd, "email");
+  const notify = text(fd, "notify_email");
   if (phone.replace(/\D/g, "").length < 10) return { error: "Enter a full phone number, including area code." };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." };
-  await query("update site_settings set phone = $1, email = $2, updated_at = now() where id = 1", [phone, email]);
+  if (!isEmail(email)) return { error: "Enter a valid email address." };
+  if (notify && !isEmail(notify)) return { error: "Enter a valid address for form alerts, or leave it blank." };
+  await query(
+    "update site_settings set phone = $1, email = $2, notify_email = $3, updated_at = now() where id = 1",
+    [phone, email, notify],
+  );
   refreshSite();
   return { ok: "Saved. The website now shows these contact details." };
 }

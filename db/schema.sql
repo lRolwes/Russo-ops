@@ -61,3 +61,24 @@ insert into site_settings (phone, email) values ('(636) 515-5645', 'ERusso@Russo
 --   update admins set password_hash = crypt('NEW-PASSWORD', gen_salt('bf', 10))
 --   where lower(email) = 'erusso@russo-ops.com';
 -- ---------------------------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------------------------
+-- Added 2026-10-02: contact / talent-network form submissions and the alert address.
+create table submissions (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('contact','talent')),
+  inquiry_type text not null default '',
+  name text not null,
+  email text not null,
+  phone text not null default '',
+  fields jsonb not null,                -- ordered [label, value] pairs exactly as submitted
+  page text not null default '',
+  status text not null default 'new' check (status in ('new','handled')),
+  email_status text not null default '',
+  ip text not null default '',          -- used only to rate-limit repeat submissions
+  created_at timestamptz not null default now()
+);
+create index submissions_created on submissions (created_at desc);
+create index submissions_ip on submissions (ip, created_at);
+
+alter table site_settings add column notify_email text not null default '';
