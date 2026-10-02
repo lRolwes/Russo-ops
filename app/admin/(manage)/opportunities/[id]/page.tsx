@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
-import { sessionClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth";
+import { OPPORTUNITY_COLUMNS, query } from "@/lib/db";
 import type { Opportunity } from "@/lib/opportunities";
 import { OpportunityForm } from "../opportunity-form";
 
 export default async function EditOpportunityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await sessionClient();
-  const { data } = await supabase.from("opportunities").select("*").eq("id", id).maybeSingle();
-  if (!data) notFound();
-  const job = data as Opportunity;
+  await requireAdmin();
+  const uuid = /^[0-9a-f-]{36}$/i.test(id) ? id : "00000000-0000-0000-0000-000000000000";
+  const [job] = await query<Opportunity>(`select ${OPPORTUNITY_COLUMNS} from opportunities where id = $1`, [uuid]);
+  if (!job) notFound();
   return (
     <>
       <div className="adm-head">

@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { signIn, type FormState } from "../actions";
+import { keepFields } from "../keep-fields";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(signIn, {});
   return (
-    <form action={action} className="adm-form">
+    <form onSubmit={keepFields(action)} className="adm-form">
       <label>
         <span>Email</span>
         <input name="email" type="email" autoComplete="username" required autoFocus />

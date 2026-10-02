@@ -1,6 +1,8 @@
+import { requireAdmin } from "@/lib/auth";
 import { OpportunityForm } from "../opportunity-form";
 
-export default function NewOpportunityPage() {
+export default async function NewOpportunityPage() {
+  await requireAdmin();
   return (
     <>
       <div className="adm-head">

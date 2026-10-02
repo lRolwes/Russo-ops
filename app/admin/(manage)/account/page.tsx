@@ -1,6 +1,8 @@
+import { requireAdmin } from "@/lib/auth";
 import { PasswordForm } from "./password-form";
 
-export default function AccountPage() {
+export default async function AccountPage() {
+  await requireAdmin();
   return (
     <>
       <div className="adm-head">

@@ -1,9 +1,10 @@
-import { sessionClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth";
+import { query } from "@/lib/db";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
-  const supabase = await sessionClient();
-  const { data } = await supabase.from("site_settings").select("phone,email").eq("id", 1).single();
+  await requireAdmin();
+  const [data] = await query<{ phone: string; email: string }>("select phone, email from site_settings where id = 1");
   return (
     <>
       <div className="adm-head">

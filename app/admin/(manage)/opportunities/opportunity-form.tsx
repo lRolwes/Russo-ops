@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { deleteOpportunity, saveOpportunity, type FormState } from "../../actions";
+import { keepFields } from "../../keep-fields";
 import { EMPLOYMENT_TYPES, WORK_MODELS, type Opportunity } from "@/lib/opportunities";
 
 export function OpportunityForm({ job }: { job?: Opportunity }) {
@@ -10,7 +11,7 @@ export function OpportunityForm({ job }: { job?: Opportunity }) {
 
   return (
     <>
-      <form action={action} className="adm-card adm-form adm-grid">
+      <form onSubmit={keepFields(action)} className="adm-card adm-form adm-grid">
         {job && <input type="hidden" name="id" value={job.id} />}
 
         <label className="full">

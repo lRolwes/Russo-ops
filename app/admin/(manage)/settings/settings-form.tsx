@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { saveSettings, type FormState } from "../../actions";
+import { keepFields } from "../../keep-fields";
 
 export function SettingsForm({ phone, email }: { phone: string; email: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveSettings, {});
   return (
-    <form action={action} className="adm-card adm-form adm-narrow">
+    <form onSubmit={keepFields(action)} className="adm-card adm-form adm-narrow">
       <label>
         <span>Phone number</span>
         <input name="phone" type="tel" required defaultValue={phone} />

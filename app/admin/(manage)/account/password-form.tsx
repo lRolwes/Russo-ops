@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { changePassword, type FormState } from "../../actions";
+import { keepFields } from "../../keep-fields";
 
 export function PasswordForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(changePassword, {});
   return (
-    <form action={action} className="adm-card adm-form adm-narrow">
+    <form onSubmit={keepFields(action)} className="adm-card adm-form adm-narrow">
       <label>
         <span>New password</span>
         <input name="password" type="password" autoComplete="new-password" minLength={8} required />

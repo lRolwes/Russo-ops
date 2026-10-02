@@ -1,8 +1,8 @@
 # ROC Group website (russo-ops.com)
 
 Next.js site for Russo Operational Consulting Group, rebuilt from the approved ChatGPT review build
-(roc-group-website.erusso1223.chatgpt.site). Hosted on Vercel; job listings and contact details live in
-Supabase (project `roc-website`, ref `kvnxzppebqbaxnqybzie`).
+(roc-group-website.erusso1223.chatgpt.site). Hosted on Vercel; job listings, contact details and
+site-manager logins live in a Neon Postgres database connected through Vercel (`DATABASE_URL`).
 
 ## Site manager — `/admin`
 
@@ -15,22 +15,26 @@ ROC signs in at **/admin** with email and password to:
 Listings marked Published appear immediately; Draft and Closed stay off the site; a listing with a closing
 date drops off automatically after that date.
 
-### Giving someone access
+### Database setup (once)
 
-1. Supabase dashboard → `roc-website` → Authentication → Users → **Add user** → enter email + password,
-   tick **Auto Confirm User**.
-2. SQL Editor → run (with their email):
+Neon console → the project → **SQL Editor** → paste all of `db/schema.sql` → Run.
 
-   ```sql
-   insert into public.admins (user_id) select id from auth.users where email = 'person@example.com';
-   ```
+### Giving someone access / resetting a password
 
-To remove access: `delete from public.admins where user_id = (select id from auth.users where email = '...');`
+In the Neon SQL Editor (passwords are stored as bcrypt hashes, never plain text):
 
-Recommended once: Authentication → Sign In / Providers → turn **off** "Allow new users to sign up".
-(Even with it on, a self-registered account cannot change anything — only users in `admins` can.)
+```sql
+-- add a login
+insert into admins (email, password_hash)
+values ('person@example.com', crypt('their-password', gen_salt('bf', 10)));
 
-Forgot password: reset it in Supabase → Authentication → Users → the user's "…" menu.
+-- reset a forgotten password
+update admins set password_hash = crypt('new-password', gen_salt('bf', 10))
+where lower(email) = 'person@example.com';
+
+-- remove access
+delete from admins where lower(email) = 'person@example.com';
+```
 
 ## Where to edit the code
 
@@ -40,12 +44,11 @@ Forgot password: reset it in Supabase → Authentication → Users → the user'
 | `app/site-shell.tsx` | Header, footer, homepage, page templates, job pages, contact and talent-network forms |
 | `app/globals.css` | The full visual system (colors, layout, responsive rules) |
 | `app/admin/` | The site manager (login, opportunities, contact details, password) |
+| `lib/auth.ts` | Sign-in and sessions (database-backed, httpOnly cookie) |
 | `lib/data.ts` | Public database reads (with safe fallbacks if the database is unreachable) |
+| `db/schema.sql` | Database tables |
 | `next.config.ts` | Permanent redirects from old Webflow URLs |
 | `public/` | ROC logo, mark, favicon and social-preview image |
-
-Database security is enforced by row-level security policies: the public can read only live listings and
-the contact details; only users in `public.admins` can write.
 
 ## Run locally
 
@@ -54,10 +57,13 @@ npm install
 npm run dev
 ```
 
+Without `DATABASE_URL` the public site still runs (no listings, default contact details); add it to
+`.env.local` to work on the site manager.
+
 ## Deploy
 
-Push to `main`; Vercel builds and deploys automatically. A daily Vercel cron calls `/api/keepalive` so the
-free Supabase project never pauses for inactivity.
+Push to `main`; Vercel builds and deploys automatically. Public pages are cached and refresh hourly, and
+immediately whenever something is saved in the site manager.
 
 ## Forms
 

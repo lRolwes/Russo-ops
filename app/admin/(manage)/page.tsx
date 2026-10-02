@@ -1,4 +1,5 @@
-import { sessionClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth";
+import { OPPORTUNITY_COLUMNS, query } from "@/lib/db";
 import { formatDate, type Opportunity } from "@/lib/opportunities";
 
 function siteStatus(job: Opportunity, today: string) {
@@ -14,13 +15,10 @@ export default async function OpportunitiesPage({
   searchParams: Promise<{ saved?: string; deleted?: string }>;
 }) {
   const sp = await searchParams;
-  const supabase = await sessionClient();
-  const { data } = await supabase
-    .from("opportunities")
-    .select("*")
-    .order("posted_on", { ascending: false })
-    .order("created_at", { ascending: false });
-  const jobs = (data as Opportunity[]) ?? [];
+  await requireAdmin();
+  const jobs = await query<Opportunity>(
+    `select ${OPPORTUNITY_COLUMNS} from opportunities order by posted_on desc, created_at desc`,
+  );
   const today = new Date().toISOString().slice(0, 10);
   const live = jobs.filter((j) => siteStatus(j, today).tone === "live").length;
 

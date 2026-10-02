@@ -20,8 +20,8 @@ function resolve(slug: string[]): { props: ShellProps; title: string; descriptio
   return null;
 }
 
-export const dynamicParams = false;
-
+// Unknown paths fall through to notFound() below. (dynamicParams = false would also 404 every page
+// here after a site-manager save refreshes the cache.)
 export function generateStaticParams(): Params[] {
   return [...Object.keys(special), ...contentPages.map((p) => p.path)].map((p) => ({ slug: p.split("/") }));
 }
